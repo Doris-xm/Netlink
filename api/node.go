@@ -7,6 +7,8 @@ type Node struct {
 	NetNs     string
 	IsNormal  bool
 	Image     string
+
+	Rules map[string]LinkProperties // len(Rules) will never decrease, used for classid
 }
 
 type NodeInterface struct {

@@ -36,6 +36,10 @@ func main() {
 	err := m.AddLink(api.Link{
 		SrcNode: "node1",
 		DstNode: "node2",
+		Properties: api.LinkProperties{
+			Rate: 1000,
+		},
+		UniDirectional: false,
 	})
 	if err != nil {
 		println(err.Error())

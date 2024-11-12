@@ -75,6 +75,24 @@ func (om *OvsManager) AddFlowsByLink(link *api.Link) error {
 	}); err != nil {
 		return err
 	}
+	if err = om.ApplyLinkProperty(link); err != nil {
+		println("Error applying link property")
+		return err
+	}
+	return nil
+}
+
+func (om *OvsManager) ApplyLinkProperty(link *api.Link) error {
+	//if link.Properties.Rate > 0 {
+	//	if err := om.SetBandwidthLimit(link.SrcNode+"-ovs", link.Properties.Rate); err != nil {
+	//		return err
+	//	}
+	//}
+	//if link.Properties.Latency > 0 {
+	//	if err := om.SetLatency(link.SrcNode+"-ovs", link.Properties.Latency); err != nil {
+	//		return err
+	//	}
+	//}
 	return nil
 }
 

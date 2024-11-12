@@ -14,17 +14,10 @@ type Link struct {
 }
 
 type LinkProperties struct {
-	Latency       string
-	LatencyCorr   string
-	Jitter        string
-	Loss          string
-	LossCorr      string
-	Rate          string
-	Gap           uint32
-	Duplicate     string
-	DuplicateCorr string
-	ReorderProb   string
-	ReorderCorr   string
-	CorruptProb   string
-	CorruptCorr   string
+	Latency       uint32 // in ms
+	Loss          float32
+	Rate          uint64 // in mbps
+	HTBClassid    uint32 // netlink.Makehandle(1, 1)
+	DstIP         string // for filtering (192.168.1.1)
+	NetemHandleId string
 }
