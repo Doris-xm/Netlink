@@ -5,6 +5,7 @@ import (
 	"fmt"
 	ns "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
+	"golang.org/x/sys/unix"
 	"net"
 	"strings"
 )
@@ -94,36 +95,37 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 			return fmt.Errorf("failed to add HTB class: %v", err)
 		}
 
-		//// 2. filter by destination IP
-		//ipInt, err := IpToInt(l.Properties.DstIP)
-		//if err != nil {
-		//	return err
-		//}
+		// 2. filter by destination IP
+		ipInt, err := IpToInt(l.Properties.DstIP)
+		if err != nil {
+			return err
+		}
 
-		//filter := &netlink.U32{
-		//	FilterAttrs: netlink.FilterAttrs{
-		//		LinkIndex: link.Attrs().Index,
-		//		Parent:    netlink.MakeHandle(1, 0),
-		//		Handle:    l.Properties.HTBClassid,
-		//		Priority:  1,
-		//	},
-		//	// Match src IP 192.168.1.1
-		//	Sel: &netlink.TcU32Sel{
-		//		Keys: []netlink.TcU32Key{
-		//			{
-		//				Mask:    0xffffffff,
-		//				Val:     ipInt, // Using the converted IP integer
-		//				Off:     12,    // Offset for source IP in IP header
-		//				OffMask: 0,
-		//			},
-		//		},
-		//	},
-		//	ClassId: l.Properties.HTBClassid,
-		//}
-		//
-		//if err := netlink.FilterAdd(filter); err != nil {
-		//	return fmt.Errorf("failed to add u32 filter: %v", err)
-		//}
+		filter := &netlink.U32{
+			FilterAttrs: netlink.FilterAttrs{
+				LinkIndex: link.Attrs().Index,
+				Parent:    netlink.MakeHandle(1, 0),
+				Handle:    netlink.MakeHandle(1, 0),
+				Priority:  1,
+				Protocol:  unix.ETH_P_IP,
+			},
+			// Match dst IP 192.168.1.1
+			Sel: &netlink.TcU32Sel{
+				Keys: []netlink.TcU32Key{
+					{
+						Mask: 0xffffffff,
+						Val:  ipInt, // Using the converted IP integer
+						Off:  16,    // Offset for dst IP (12 for src IP)
+					},
+				},
+				Flags: netlink.TC_U32_TERMINAL, // Terminal action, no further classification. IMPORTANT!
+			},
+			ClassId: l.Properties.HTBClassid,
+		}
+
+		if err := netlink.FilterAdd(filter); err != nil {
+			return fmt.Errorf("failed to add u32 filter: %v", err)
+		}
 		return nil
 	})
 

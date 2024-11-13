@@ -34,10 +34,10 @@ func main() {
 	}
 
 	err := m.AddLink(api.Link{
-		SrcNode: "node1",
-		DstNode: "node2",
+		SrcNode: "node2",
+		DstNode: "node1",
 		Properties: api.LinkProperties{
-			Rate: 1000,
+			Rate: 10,
 		},
 		UniDirectional: false,
 	})
