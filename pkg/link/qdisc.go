@@ -36,6 +36,7 @@ func (lm *LinkManager) CreateRootQdisc(n api.Node) error {
 				Handle:    netlink.MakeHandle(1, 0), // root qdisc
 				Parent:    netlink.HANDLE_ROOT,      // root handle
 			})
+		qdisc.Defcls = 1 // Default classid 1:1
 
 		// add HTB root qdisc
 		if err := netlink.QdiscAdd(qdisc); err != nil {
@@ -48,8 +49,8 @@ func (lm *LinkManager) CreateRootQdisc(n api.Node) error {
 }
 
 // CreateHtbClass :
-// tc class add dev eth0 parent 1: classid 1:1 htb rate 1mbit
-// tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip src 192.168.1.1 flowid 1:1
+// tc class add dev eth0 parent 1: classid 1:2 htb rate 1mbit burst 10000
+// tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dst 192.168.1.1 flowid 1:1
 // tc qdisc add dev eth0 parent 1:1 handle 10: netem delay 100ms
 // will modify node.Rules, record the classid
 // bw control comes before loss and latency
@@ -58,7 +59,7 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 	if l.Properties.Latency <= 0 && l.Properties.Rate <= 0 && l.Properties.Loss <= 0 {
 		return nil
 	}
-	l.Properties.HTBClassid = netlink.MakeHandle(1, uint16(len(n.Rules)+1))
+	l.Properties.HTBClassid = netlink.MakeHandle(1, uint16(len(n.Rules)+2)) // +2 for root and default class
 	n.Rules[l.DstNode] = l.Properties
 
 	// enter container namespace
@@ -79,11 +80,13 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 		class := netlink.NewHtbClass(
 			netlink.ClassAttrs{
 				LinkIndex: link.Attrs().Index,
-				Handle:    l.Properties.HTBClassid,  // classid 1:1
+				Handle:    l.Properties.HTBClassid,  // classid 1:2
 				Parent:    netlink.MakeHandle(1, 0), // parent 1:
 			},
 			netlink.HtbClassAttrs{
-				Rate: l.Properties.Rate * 1024 * 1024, // rate 1mbit
+				Rate:   l.Properties.Rate * 1024 * 1024, // rate 1mbit
+				Buffer: 10000,                           // burst 10000
+				Prio:   1,
 			},
 		)
 
