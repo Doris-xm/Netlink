@@ -15,6 +15,7 @@ import (
 type ContainerManager struct {
 	dClient *client.Client
 	om      *ovs.OvsManager
+	seq     int
 }
 
 func NewContainerManager(o *ovs.OvsManager) *ContainerManager {
@@ -25,10 +26,13 @@ func NewContainerManager(o *ovs.OvsManager) *ContainerManager {
 	return &ContainerManager{
 		dClient: dClient,
 		om:      o,
+		seq:     1,
 	}
 }
 
 func (cm *ContainerManager) AddNode(ctx context.Context, n *api.Node) error {
+	n.Uid = cm.seq
+	cm.seq++
 	sysctls := make(map[string]string)
 	sysctls["net.ipv4.ip_forward"] = "1"
 	sysctls["net.ipv6.conf.all.forwarding"] = "1"
@@ -66,7 +70,10 @@ func (cm *ContainerManager) AddNode(ctx context.Context, n *api.Node) error {
 	if err != nil {
 		return err
 	}
-	return nil
+
+	// Create group table for nodex-ovs
+	err = cm.om.AddGroupTable(n.Name+"-ovs", n.Uid)
+	return err
 }
 
 func (cm *ContainerManager) CreateVethPair(n *api.Node) error {

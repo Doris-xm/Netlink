@@ -71,7 +71,7 @@ func (m *Manager) AddLink(l api.Link) error {
 	l.DstIntf = m.Nodes[l.DstNode].Interface
 
 	m.Links = append(m.Links, l)
-	err := m.lm.ApplyLink(&l)
+	err := m.lm.ApplyLink(&l, m.Nodes[l.SrcNode], m.Nodes[l.DstNode])
 	if err != nil {
 		return err
 	}

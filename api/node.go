@@ -1,7 +1,7 @@
 package api
 
 type Node struct {
-	Uid       int32
+	Uid       int
 	Name      string
 	Interface NodeInterface
 	NetNs     string

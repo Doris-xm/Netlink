@@ -15,8 +15,8 @@ func NewLinkManager(o *ovs.OvsManager) *LinkManager {
 	}
 }
 
-func (lm *LinkManager) ApplyLink(link *api.Link) error {
-	return lm.om.AddFlowsByLink(link)
+func (lm *LinkManager) ApplyLink(link *api.Link, src api.Node, dst api.Node) error {
+	return lm.om.AddFlowsByLink(link, src, dst)
 }
 
 // ApplyLinkProperties : Apply link properties only for unidirectional link

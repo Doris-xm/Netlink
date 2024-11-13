@@ -4,6 +4,7 @@ import (
 	"Netlink/api"
 	"fmt"
 	"github.com/digitalocean/go-openvswitch/ovs"
+	"github.com/sirupsen/logrus"
 	"github.com/vishvananda/netlink"
 	"os/exec"
 	"strconv"
@@ -24,6 +25,18 @@ func (om *OvsManager) CreateBridge() error {
 	if err := om.oClinet.VSwitch.AddBridge(om.bridge); err != nil {
 		return err
 	}
+	// 删除默认的 NORMAL 规则
+	if err := om.oClinet.OpenFlow.DelFlows(om.bridge, &ovs.MatchFlow{}); err != nil {
+		return err
+	}
+
+	// sudo ovs-vsctl set bridge ovs-br-host datapath_type=system
+	cmd := exec.Command("ovs-vsctl", "set", "bridge", "netlink-br0", "datapath_type=system")
+	err := cmd.Run()
+	if err != nil {
+		logrus.Fatalf("error setting OVS bridge %s datapath type: %v", "netlink-br0", err)
+	}
+
 	return nil
 }
 
@@ -55,45 +68,22 @@ func (om *OvsManager) AddVeth(vethHost string) error {
 	return nil
 }
 
-func (om *OvsManager) AddFlowsByLink(link *api.Link) error {
-
-	srcPort, err := GetPortId(om.bridge, link.SrcNode+"-ovs")
+func (om *OvsManager) AddFlowsByLink(link *api.Link, src api.Node, dst api.Node) error {
+	// Add flow to ovs group table
+	//  ovs-ofctl mod-group netlink-br0 group_id=2,type=all,bucket=output:"node1-ovs",bucket=output:"node3-ovs"
+	cmd := exec.Command("ovs-ofctl", "mod-group", om.bridge, "group_id="+strconv.Itoa(src.Uid)+",type=all,bucket=output:\""+dst.Name+"-ovs\"")
+	err := cmd.Run()
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to add group table: %v", err)
 	}
-	dstPort, err := GetPortId(om.bridge, link.DstNode+"-ovs")
-	if err != nil {
-		return err
-	}
-	if err = om.oClinet.OpenFlow.AddFlow(om.bridge, &ovs.Flow{
-		Matches: []ovs.Match{
-			ovs.InPortMatch(srcPort),
-		},
-		Actions: []ovs.Action{
-			ovs.Output(dstPort),
-		},
-	}); err != nil {
-		return err
-	}
-	if err = om.ApplyLinkProperty(link); err != nil {
-		println("Error applying link property")
-		return err
-	}
-	return nil
-}
 
-func (om *OvsManager) ApplyLinkProperty(link *api.Link) error {
-	//if link.Properties.Rate > 0 {
-	//	if err := om.SetBandwidthLimit(link.SrcNode+"-ovs", link.Properties.Rate); err != nil {
-	//		return err
-	//	}
-	//}
-	//if link.Properties.Latency > 0 {
-	//	if err := om.SetLatency(link.SrcNode+"-ovs", link.Properties.Latency); err != nil {
-	//		return err
-	//	}
-	//}
-	return nil
+	cmd = exec.Command("ovs-ofctl", "mod-group", om.bridge, "group_id="+strconv.Itoa(dst.Uid)+",type=all,bucket=output:\""+src.Name+"-ovs\"")
+	err = cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to add group table: %v", err)
+	}
+
+	return err
 }
 
 func GetPortId(bridge, port string) (int, error) {
@@ -108,4 +98,20 @@ func GetPortId(bridge, port string) (int, error) {
 		return -1, fmt.Errorf("error converting port %s id %s to int: %v", port, resultStr, err)
 	}
 	return resultInt, nil
+}
+
+func (om *OvsManager) AddGroupTable(intf string, groupId int) error {
+	// ovs-ofctl add-group netlink-br0 group_id=2,type=all
+	cmd := exec.Command("ovs-ofctl", "add-group", om.bridge, "group_id="+strconv.Itoa(groupId)+",type=all")
+	err := cmd.Run()
+	if err != nil {
+		return fmt.Errorf("failed to add group table: %v", err)
+	}
+
+	in_port, _ := GetPortId(om.bridge, intf)
+	//ovs-ofctl add-flow netlink-br0 in_port=7,actions=group:2
+	cmd = exec.Command("ovs-ofctl", "add-flow", om.bridge, "in_port="+strconv.Itoa(in_port)+",actions=group:"+strconv.Itoa(groupId))
+	err = cmd.Run()
+
+	return err
 }
