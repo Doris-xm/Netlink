@@ -1,7 +1,6 @@
 package main
 
 import (
-	"Netlink/cmd"
 	"Netlink/pkg"
 	"fmt"
 	"os"
@@ -25,9 +24,50 @@ func main() {
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if err := cmd.Execute(c); err != nil {
-			fmt.Println("Error:", err.Error())
-			os.Exit(1)
+		// 循环接收并执行命令
+		for {
+			var input string
+			fmt.Print("Enter command: ")
+			_, err := fmt.Scanln(&input)
+			if err != nil {
+				fmt.Println("Error reading input:", err)
+				continue
+			}
+
+			// 根据输入的命令执行相应的操作
+			switch input {
+			case "apply":
+				_, err := fmt.Scanln(&input)
+				if err != nil {
+					fmt.Println("Error reading input:", err)
+					return
+				}
+				err = c.ApplyTopoConfig(input)
+				if err != nil {
+					stop <- syscall.SIGTERM
+					fmt.Println("Error applying configuration:", err)
+				} else {
+					fmt.Println("Configuration applied successfully.")
+				}
+			case "exit":
+				fmt.Println("Exiting...")
+				stop <- syscall.SIGTERM
+				return
+			case "show":
+				_, err := fmt.Scanln(&input)
+				if err != nil {
+					fmt.Println("Error reading input:", err)
+					return
+				}
+				switch input {
+				case "nodes":
+					c.ShowNodes()
+				case "links":
+					c.ShowLinks()
+				}
+			default:
+				continue
+			}
 		}
 	}()
 
@@ -39,5 +79,6 @@ func main() {
 	//}
 	// wait, before shutting down , clear up the resources
 	<-stop
+	//c.Destroy()
 
 }

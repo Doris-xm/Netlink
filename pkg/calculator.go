@@ -49,3 +49,17 @@ func (c *Calculator) ApplyTopoConfig(filepath string) error {
 func (c *Calculator) Destroy() {
 	c.m.Destroy()
 }
+
+func (c *Calculator) ShowNodes() {
+	for _, node := range c.m.Nodes {
+		fmt.Printf("Node: %s, Uid: %d, Interface: %s, IPv4: %s\n", node.Name, node.Uid, node.Interface.Name, node.Interface.Ipv4)
+	}
+}
+
+func (c *Calculator) ShowLinks() {
+	for _, node := range c.m.Nodes {
+		for dstNode, link := range node.Rules {
+			fmt.Printf("Link: Src: %s, Dst: %s, Bw: %dMbps, Delay: %dms, Loss: %.2f\n", node.Name, dstNode, link.Rate, link.Latency, link.Loss)
+		}
+	}
+}

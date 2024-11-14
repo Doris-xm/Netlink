@@ -8,7 +8,7 @@ type Node struct {
 	IsNormal  bool
 	Image     string `yaml:"image"`
 
-	Rules map[string]LinkProperties // len(Rules) will never decrease, used for classid
+	Rules map[string]LinkProperties // len(Rules) will never decrease, used for classid, map dst --> properties
 }
 
 type NodeInterface struct {

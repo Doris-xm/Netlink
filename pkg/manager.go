@@ -14,7 +14,6 @@ import (
 // link properties, and cleaning up resources when destroyed.
 type Manager struct {
 	Nodes map[string]api.Node // map node name to node
-	Links map[string][]string // map src node to dst nodes
 	om    *ovs.OvsManager
 	lm    *link.LinkManager
 	cm    *node.ContainerManager
@@ -30,7 +29,6 @@ func NewManager() *Manager {
 
 	return &Manager{
 		Nodes: make(map[string]api.Node),
-		Links: make(map[string][]string),
 		om:    om,
 		lm:    lm,
 		cm:    cm,
@@ -76,43 +74,41 @@ func (m *Manager) AddLink(l api.Link) error {
 	}
 
 	// check src name and dst name
-	l.SrcIntf = m.Nodes[l.SrcNode].Interface
-	l.DstIntf = m.Nodes[l.DstNode].Interface
+	src := m.Nodes[l.SrcNode]
+	dst := m.Nodes[l.DstNode]
+	l.SrcIntf = src.Interface
+	l.DstIntf = dst.Interface
 
 	// check if existed
-	if existed := m.LinkExist(l.SrcNode, l.DstNode); !existed {
-		m.Links[l.SrcNode] = append(m.Links[l.SrcNode], l.DstNode)
-		if err := m.lm.ApplyLink(m.Nodes[l.SrcNode], m.Links[l.SrcNode]); err != nil {
+	if _, existed := src.Rules[l.DstNode]; !existed {
+		src.Rules[l.DstNode] = api.LinkProperties{}
+		if err := m.lm.ApplyLink(src); err != nil {
 			return err
 		}
 	}
 
 	// directional link
-	if existed := m.LinkExist(l.DstNode, l.SrcNode); !existed {
-		m.Links[l.DstNode] = append(m.Links[l.DstNode], l.SrcNode)
-		if err := m.lm.ApplyLink(m.Nodes[l.DstNode], m.Links[l.DstNode]); err != nil {
+	if _, existed := dst.Rules[l.SrcNode]; !existed {
+		dst.Rules[l.SrcNode] = api.LinkProperties{}
+		if err := m.lm.ApplyLink(dst); err != nil {
 			return err
 		}
 	}
 
 	// Apply Properties
-	src := m.Nodes[l.SrcNode]
-	dst := m.Nodes[l.DstNode]
-
 	if err := m.lm.ApplyLinkProperties(&l, &src, dst); err != nil {
 		return err
 	}
-
-	// update src node
-	m.Nodes[l.SrcNode] = src
 
 	if !l.UniDirectional {
 		if err := m.lm.ApplyLinkProperties(&l, &dst, src); err != nil {
 			return err
 		}
 
-		m.Nodes[l.DstNode] = dst
 	}
+	// update src & dst node
+	m.Nodes[l.SrcNode] = src
+	m.Nodes[l.DstNode] = dst
 
 	return nil
 }
@@ -129,15 +125,4 @@ func (m *Manager) Destroy() {
 		println(err.Error())
 		return
 	}
-}
-
-func (m *Manager) LinkExist(src, dst string) bool {
-	if _, existed := m.Links[src]; existed {
-		for _, d := range m.Links[src] {
-			if d == dst {
-				return true
-			}
-		}
-	}
-	return false
 }
