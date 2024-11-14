@@ -11,7 +11,7 @@ import (
 
 type Manager struct {
 	Nodes map[string]api.Node // map node name to node
-	Links []api.Link
+	Links map[string][]string // map src node to dst nodes
 	om    *ovs.OvsManager
 	lm    *link.LinkManager
 	cm    *node.ContainerManager
@@ -29,7 +29,7 @@ func NewManager() Manager {
 
 	return Manager{
 		Nodes: make(map[string]api.Node),
-		Links: make([]api.Link, 0),
+		Links: make(map[string][]string),
 		om:    om,
 		lm:    lm,
 		cm:    cm,
@@ -70,17 +70,27 @@ func (m *Manager) AddLink(l api.Link) error {
 	l.SrcIntf = m.Nodes[l.SrcNode].Interface
 	l.DstIntf = m.Nodes[l.DstNode].Interface
 
-	m.Links = append(m.Links, l)
-	err := m.lm.ApplyLink(&l, m.Nodes[l.SrcNode], m.Nodes[l.DstNode])
-	if err != nil {
-		return err
+	// check if existed
+	if existed := m.LinkExist(l.SrcNode, l.DstNode); !existed {
+		m.Links[l.SrcNode] = append(m.Links[l.SrcNode], l.DstNode)
+		if err := m.lm.ApplyLink(m.Nodes[l.SrcNode], m.Links[l.SrcNode]); err != nil {
+			return err
+		}
+	}
+
+	// directional link
+	if existed := m.LinkExist(l.DstNode, l.SrcNode); !existed {
+		m.Links[l.DstNode] = append(m.Links[l.DstNode], l.SrcNode)
+		if err := m.lm.ApplyLink(m.Nodes[l.DstNode], m.Links[l.DstNode]); err != nil {
+			return err
+		}
 	}
 
 	// Apply Properties
 	src := m.Nodes[l.SrcNode]
 	dst := m.Nodes[l.DstNode]
 
-	if err = m.lm.ApplyLinkProperties(&l, &src, dst); err != nil {
+	if err := m.lm.ApplyLinkProperties(&l, &src, dst); err != nil {
 		return err
 	}
 
@@ -88,7 +98,7 @@ func (m *Manager) AddLink(l api.Link) error {
 	m.Nodes[l.SrcNode] = src
 
 	if !l.UniDirectional {
-		if err = m.lm.ApplyLinkProperties(&l, &dst, src); err != nil {
+		if err := m.lm.ApplyLinkProperties(&l, &dst, src); err != nil {
 			return err
 		}
 
@@ -110,4 +120,15 @@ func (m *Manager) Destroy() {
 		println(err.Error())
 		return
 	}
+}
+
+func (m *Manager) LinkExist(src, dst string) bool {
+	if _, existed := m.Links[src]; existed {
+		for _, d := range m.Links[src] {
+			if d == dst {
+				return true
+			}
+		}
+	}
+	return false
 }

@@ -17,6 +17,8 @@ import (
 func main() {
 	m := pkg.NewManager()
 
+	defer m.Destroy()
+
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
 	for i := 1; i <= 3; i++ {
@@ -56,6 +58,5 @@ func main() {
 
 	// wait, before shutting down , clear up the resources
 	<-stop
-	m.Destroy()
 
 }

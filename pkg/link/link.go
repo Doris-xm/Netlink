@@ -15,8 +15,16 @@ func NewLinkManager(o *ovs.OvsManager) *LinkManager {
 	}
 }
 
-func (lm *LinkManager) ApplyLink(link *api.Link, src api.Node, dst api.Node) error {
-	return lm.om.AddFlowsByLink(link, src, dst)
+func (lm *LinkManager) ApplyLink(src api.Node, dsts []string) error {
+	if len(dsts) == 0 {
+		return nil
+	}
+
+	var output string
+	for _, dst := range dsts {
+		output += ",bucket=output:\"" + dst + "-ovs\"" // ,bucket=output:"node1-ovs",bucket=output:"node2-ovs"
+	}
+	return lm.om.AddFlowsByLink(src, output)
 }
 
 // ApplyLinkProperties : Apply link properties only for unidirectional link

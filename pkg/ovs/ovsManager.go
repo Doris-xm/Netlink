@@ -68,19 +68,14 @@ func (om *OvsManager) AddVeth(vethHost string) error {
 	return nil
 }
 
-func (om *OvsManager) AddFlowsByLink(link *api.Link, src api.Node, dst api.Node) error {
+func (om *OvsManager) AddFlowsByLink(src api.Node, output string) error {
 	// Add flow to ovs group table
 	//  ovs-ofctl mod-group netlink-br0 group_id=2,type=all,bucket=output:"node1-ovs",bucket=output:"node3-ovs"
-	cmd := exec.Command("ovs-ofctl", "mod-group", om.bridge, "group_id="+strconv.Itoa(src.Uid)+",type=all,bucket=output:\""+dst.Name+"-ovs\"")
-	err := cmd.Run()
+	cmd := exec.Command("ovs-ofctl", "mod-group", om.bridge, "group_id="+strconv.Itoa(src.Uid)+",type=all"+output)
+	//println(cmd.String())
+	res, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to add group table: %v", err)
-	}
-
-	cmd = exec.Command("ovs-ofctl", "mod-group", om.bridge, "group_id="+strconv.Itoa(dst.Uid)+",type=all,bucket=output:\""+src.Name+"-ovs\"")
-	err = cmd.Run()
-	if err != nil {
-		return fmt.Errorf("failed to add group table: %v", err)
+		return fmt.Errorf("failed to add group table: %v", string(res))
 	}
 
 	return err
@@ -103,9 +98,9 @@ func GetPortId(bridge, port string) (int, error) {
 func (om *OvsManager) AddGroupTable(intf string, groupId int) error {
 	// ovs-ofctl add-group netlink-br0 group_id=2,type=all
 	cmd := exec.Command("ovs-ofctl", "add-group", om.bridge, "group_id="+strconv.Itoa(groupId)+",type=all")
-	err := cmd.Run()
+	res, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("failed to add group table: %v", err)
+		return fmt.Errorf("failed to add group table: %v", string(res))
 	}
 
 	in_port, _ := GetPortId(om.bridge, intf)
