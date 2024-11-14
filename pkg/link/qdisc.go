@@ -12,6 +12,10 @@ import (
 	"strings"
 )
 
+const (
+	MaxRate = 100 * 1024 // 100gbps
+)
+
 // 1. Only finish htb qdisc
 // 2. Use 1:0 as all parent handle
 // 3. Filter by destination IP
@@ -61,6 +65,9 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 
 	if l.Properties.Latency <= 0 && l.Properties.Rate <= 0 && l.Properties.Loss <= 0 {
 		return nil
+	}
+	if l.Properties.Rate <= 0 {
+		l.Properties.Rate = MaxRate
 	}
 	l.Properties.HTBClassid = netlink.MakeHandle(1, uint16(len(n.Rules)+2)) // +2 for root and default class
 	l.Properties.NetemHandleId = netlink.MakeHandle(uint16(len(n.Rules)+2), 0)
@@ -157,6 +164,9 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 // tc class change dev node1-veth0 parent 1: classid 1:2 htb rate 1mbit burst 10000
 func (lm *LinkManager) UpdateHtbClass(l *api.Link, n *api.Node) error {
 	var oldRule = n.Rules[l.DstNode]
+	if l.Properties.Rate <= 0 {
+		l.Properties.Rate = MaxRate
+	}
 	if oldRule.Rate == l.Properties.Rate && oldRule.Latency == l.Properties.Latency && oldRule.Loss == l.Properties.Loss {
 		return nil
 	}
