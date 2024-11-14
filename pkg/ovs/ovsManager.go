@@ -11,35 +11,54 @@ import (
 	"strings"
 )
 
+const (
+	DefaultBridge     = "netlink-br0"
+	VethOvsSideSuffix = "-ovs"
+)
+
 type OvsManager struct {
 	oClinet *ovs.Client
 	bridge  string
 }
 
+// NewOvsManager creates a new OvsManager
+// and initializes the default bridge
 func NewOvsManager() *OvsManager {
 	c := ovs.New()
-	return &OvsManager{c, "netlink-br0"}
+	om := &OvsManager{
+		oClinet: c,
+		bridge:  DefaultBridge,
+	}
+	err := om.CreateBridge()
+	if err != nil {
+		panic(err)
+	}
+	return om
 }
 
+// CreateBridge creates a new OVS bridge
+// deletes the default NORMAL rule, not supporting broadcast
 func (om *OvsManager) CreateBridge() error {
 	if err := om.oClinet.VSwitch.AddBridge(om.bridge); err != nil {
 		return err
 	}
-	// 删除默认的 NORMAL 规则
+	// delete the default NORMAL rule
 	if err := om.oClinet.OpenFlow.DelFlows(om.bridge, &ovs.MatchFlow{}); err != nil {
 		return err
 	}
 
 	// sudo ovs-vsctl set bridge ovs-br-host datapath_type=system
-	cmd := exec.Command("ovs-vsctl", "set", "bridge", "netlink-br0", "datapath_type=system")
+	// set the bridge to use the system datapath
+	cmd := exec.Command("ovs-vsctl", "set", "bridge", om.bridge, "datapath_type=system")
 	err := cmd.Run()
 	if err != nil {
-		logrus.Fatalf("error setting OVS bridge %s datapath type: %v", "netlink-br0", err)
+		logrus.Fatalf("error setting OVS bridge %s datapath type: %v", om.bridge, err)
 	}
 
 	return nil
 }
 
+// DeleteBridge deletes the OVS bridge, for cleanup
 func (om *OvsManager) DeleteBridge() error {
 	if err := om.oClinet.VSwitch.DeleteBridge(om.bridge); err != nil {
 		return err
@@ -68,6 +87,9 @@ func (om *OvsManager) AddVeth(vethHost string) error {
 	return nil
 }
 
+// AddFlowsByLink adds flows to the OVS bridge
+// use group table to forward packets to the destination
+// type is all, output is the destination port
 func (om *OvsManager) AddFlowsByLink(src api.Node, output string) error {
 	// Add flow to ovs group table
 	//  ovs-ofctl mod-group netlink-br0 group_id=2,type=all,bucket=output:"node1-ovs",bucket=output:"node3-ovs"
@@ -81,6 +103,7 @@ func (om *OvsManager) AddFlowsByLink(src api.Node, output string) error {
 	return err
 }
 
+// GetPortId returns the port id of the given port on the OVS bridge
 func GetPortId(bridge, port string) (int, error) {
 	cmd := exec.Command("ovs-vsctl", "get", "Interface", port, "ofport")
 	output, err := cmd.Output()
@@ -95,6 +118,8 @@ func GetPortId(bridge, port string) (int, error) {
 	return resultInt, nil
 }
 
+// AddGroupTable adds a group table to the OVS bridge
+// add flow to link one node with one group table
 func (om *OvsManager) AddGroupTable(intf string, groupId int) error {
 	// ovs-ofctl add-group netlink-br0 group_id=2,type=all
 	cmd := exec.Command("ovs-ofctl", "add-group", om.bridge, "group_id="+strconv.Itoa(groupId)+",type=all")

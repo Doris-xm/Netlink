@@ -9,6 +9,9 @@ import (
 	"fmt"
 )
 
+// Manager handles the management of nodes, links, and network configurations
+// in the system. It is responsible for adding nodes, linking nodes, applying
+// link properties, and cleaning up resources when destroyed.
 type Manager struct {
 	Nodes map[string]api.Node // map node name to node
 	Links map[string][]string // map src node to dst nodes
@@ -18,12 +21,10 @@ type Manager struct {
 	ctx   context.Context
 }
 
+// NewManager creates a new Manager instance with the default OVS manager
+// and container manager.
 func NewManager() Manager {
 	om := ovs.NewOvsManager()
-	err := om.CreateBridge()
-	if err != nil {
-		panic(err)
-	}
 	cm := node.NewContainerManager(om)
 	lm := link.NewLinkManager(om)
 
@@ -44,6 +45,13 @@ func (m *Manager) AddNode(n api.Node) error {
 		n.Rules = make(map[string]api.LinkProperties)
 	}
 
+	// check if existed
+	if _, existed := m.Nodes[n.Name]; existed {
+		if err := m.cm.DeleteNode(m.ctx, &n); err != nil {
+			return err
+		}
+	}
+
 	m.Nodes[n.Name] = n
 	err := m.cm.AddNode(m.ctx, &n)
 	if err != nil {
@@ -52,6 +60,7 @@ func (m *Manager) AddNode(n api.Node) error {
 	if err = m.lm.CreateRootQdisc(n); err != nil {
 		return err
 	}
+	// update node
 	m.Nodes[n.Name] = n
 
 	return nil

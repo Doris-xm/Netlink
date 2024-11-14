@@ -2,6 +2,7 @@ package link
 
 import (
 	"Netlink/api"
+	"Netlink/pkg/node"
 	"fmt"
 	ns "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
@@ -25,7 +26,7 @@ func (lm *LinkManager) CreateRootQdisc(n api.Node) error {
 
 	err = containerNs.Do(func(_ ns.NetNS) error {
 		// get link by name
-		link, err := netlink.LinkByName(n.Name + "-veth0")
+		link, err := netlink.LinkByName(n.Name + node.NodeVethSuffix)
 		if err != nil {
 			return fmt.Errorf("failed to get link by name: %v", err)
 		}
@@ -72,7 +73,7 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 
 	err = containerNs.Do(func(_ ns.NetNS) error {
 		// get link by name
-		link, err := netlink.LinkByName(n.Name + "-veth0")
+		link, err := netlink.LinkByName(n.Name + node.NodeVethSuffix)
 		if err != nil {
 			return fmt.Errorf("failed to get link by name: %v", err)
 		}

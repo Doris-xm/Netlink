@@ -12,6 +12,13 @@ import (
 	"net"
 )
 
+const (
+	NodeVethSuffix = "-veth0"
+)
+
+// ContainerManager manages the lifecycle of containers
+// seq is used to assign a unique id to each container( for ovs group id)
+// seq will never decrease
 type ContainerManager struct {
 	dClient *client.Client
 	om      *ovs.OvsManager
@@ -30,6 +37,9 @@ func NewContainerManager(o *ovs.OvsManager) *ContainerManager {
 	}
 }
 
+// AddNode creates a container with the given node configuration
+// start the container, get NetNS
+// link the container to ovs bridge
 func (cm *ContainerManager) AddNode(ctx context.Context, n *api.Node) error {
 	n.Uid = cm.seq
 	cm.seq++
@@ -66,7 +76,13 @@ func (cm *ContainerManager) AddNode(ctx context.Context, n *api.Node) error {
 	n.NetNs = fmt.Sprintf("/proc/%d/ns/net", res.State.Pid)
 	println("NetNs: ", n.NetNs)
 
-	err = cm.CreateVethPair(n)
+	return cm.LinkNodeToOVS(n)
+
+}
+
+// LinkNodeToOVS links the container to the OVS bridge
+func (cm *ContainerManager) LinkNodeToOVS(n *api.Node) error {
+	err := cm.CreateVethPair(n)
 	if err != nil {
 		return err
 	}
@@ -76,11 +92,14 @@ func (cm *ContainerManager) AddNode(ctx context.Context, n *api.Node) error {
 	return err
 }
 
+// CreateVethPair creates a veth pair and moves one end to the container
+// and adds the other end to the OVS bridge
+// add ipv4 address to the container end
 func (cm *ContainerManager) CreateVethPair(n *api.Node) error {
 
 	// 1. Create Veth pair
-	vethContainer := n.Name + "-veth0"
-	vethOvs := n.Name + "-ovs"
+	vethContainer := n.Name + NodeVethSuffix
+	vethOvs := n.Name + ovs.VethOvsSideSuffix
 	linkAttr := netlink.NewLinkAttrs()
 	linkAttr.Name = vethOvs
 	linkAttr.MTU = 1500

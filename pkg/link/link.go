@@ -22,7 +22,7 @@ func (lm *LinkManager) ApplyLink(src api.Node, dsts []string) error {
 
 	var output string
 	for _, dst := range dsts {
-		output += ",bucket=output:\"" + dst + "-ovs\"" // ,bucket=output:"node1-ovs",bucket=output:"node2-ovs"
+		output += ",bucket=output:\"" + dst + ovs.VethOvsSideSuffix + "\"" // ,bucket=output:"node1-ovs",bucket=output:"node2-ovs"
 	}
 	return lm.om.AddFlowsByLink(src, output)
 }
