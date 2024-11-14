@@ -7,6 +7,7 @@ import (
 	ns "github.com/containernetworking/plugins/pkg/ns"
 	"github.com/vishvananda/netlink"
 	"golang.org/x/sys/unix"
+	"log"
 	"net"
 	"strings"
 )
@@ -62,6 +63,7 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 		return nil
 	}
 	l.Properties.HTBClassid = netlink.MakeHandle(1, uint16(len(n.Rules)+2)) // +2 for root and default class
+	l.Properties.NetemHandleId = netlink.MakeHandle(uint16(len(n.Rules)+2), 0)
 	n.Rules[l.DstNode] = l.Properties
 
 	// enter container namespace
@@ -133,7 +135,7 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 			netemQdisc := netlink.NewNetem(netlink.QdiscAttrs{
 				LinkIndex: link.Attrs().Index,
 				Parent:    l.Properties.HTBClassid,
-				Handle:    netlink.MakeHandle(uint16(len(n.Rules)+2), 0), // Not important
+				Handle:    l.Properties.NetemHandleId, // Not important
 			}, netlink.NetemQdiscAttrs{
 				Latency: l.Properties.Latency * 1000, // delay 100ms
 				Loss:    l.Properties.Loss,           // loss 10%
@@ -149,6 +151,72 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 	})
 
 	return err
+}
+
+// UpdateHtbClass :
+// tc class change dev node1-veth0 parent 1: classid 1:2 htb rate 1mbit burst 10000
+func (lm *LinkManager) UpdateHtbClass(l *api.Link, n *api.Node) error {
+	var oldRule = n.Rules[l.DstNode]
+	if oldRule.Rate == l.Properties.Rate && oldRule.Latency == l.Properties.Latency && oldRule.Loss == l.Properties.Loss {
+		return nil
+	}
+	l.Properties.HTBClassid = oldRule.HTBClassid
+	l.Properties.DstIP = oldRule.DstIP
+	l.Properties.NetemHandleId = oldRule.NetemHandleId
+	n.Rules[l.DstNode] = l.Properties
+
+	// enter container namespace
+	containerNs, err := ns.GetNS(n.NetNs)
+	if err != nil {
+		return fmt.Errorf("failed to get namespace for container: %v", err)
+	}
+	defer containerNs.Close()
+
+	err = containerNs.Do(func(_ ns.NetNS) error {
+		// get link by name
+		link, err := netlink.LinkByName(n.Name + node.NodeVethSuffix)
+		if err != nil {
+			return fmt.Errorf("failed to get link by name: %v", err.Error())
+		}
+		// Update Htb class (bw control)
+		if l.Properties.Rate != oldRule.Rate {
+			newHtbClass := netlink.NewHtbClass(
+				netlink.ClassAttrs{
+					LinkIndex: link.Attrs().Index,
+					Handle:    l.Properties.HTBClassid,  // classid 1:2
+					Parent:    netlink.MakeHandle(1, 0), // parent 1:
+				},
+				netlink.HtbClassAttrs{
+					Rate:   l.Properties.Rate * 1024 * 1024, // rate 1mbit
+					Buffer: 10000,                           // burst 10000
+					Prio:   1,
+				},
+			)
+			if err := netlink.ClassReplace(newHtbClass); err != nil {
+				return fmt.Errorf("failed to update HTB class: %v", err)
+			}
+		}
+
+		// Update netem qdisc
+		if l.Properties.Latency != oldRule.Latency || l.Properties.Loss != oldRule.Loss {
+			log.Println("update netem qdisc: ", l.Properties.HTBClassid, oldRule.NetemHandleId)
+			newNetemQdisc := netlink.NewNetem(netlink.QdiscAttrs{
+				LinkIndex: link.Attrs().Index,
+				Parent:    l.Properties.HTBClassid,
+				Handle:    l.Properties.NetemHandleId,
+			}, netlink.NetemQdiscAttrs{
+				Latency: l.Properties.Latency * 1000, // delay 100ms
+				Loss:    l.Properties.Loss,           // loss 10%
+				Limit:   300000,
+			})
+			if err := netlink.QdiscReplace(newNetemQdisc); err != nil {
+				return fmt.Errorf("failed to update netem qdisc: %v", err)
+			}
+		}
+		return nil
+	})
+
+	return nil
 }
 
 func IpToInt(IP string) (uint32, error) {

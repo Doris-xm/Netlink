@@ -37,7 +37,7 @@ func (lm *LinkManager) ApplyLinkProperties(link *api.Link, ingress *api.Node, ds
 			// CreateHtbClass will modify ingress.Rules
 			return lm.CreateHtbClass(link, ingress)
 		}
-		return nil
+		return lm.UpdateHtbClass(link, ingress)
 	} else {
 		// CreateHtbClass will modify ingress.Rules
 		return lm.CreateHtbClass(link, ingress)

@@ -101,7 +101,10 @@ func (m *Manager) AddLink(l api.Link) error {
 	}
 
 	if !l.UniDirectional {
-		if err := m.lm.ApplyLinkProperties(&l, &dst, src); err != nil {
+		var bio_link = l
+		bio_link.SrcNode = l.DstNode
+		bio_link.DstNode = l.SrcNode
+		if err := m.lm.ApplyLinkProperties(&bio_link, &dst, src); err != nil {
 			return err
 		}
 

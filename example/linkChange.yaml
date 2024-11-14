@@ -1,0 +1,5 @@
+links:
+  - srcNode: "node2"
+    dstNode: "node5"
+    properties:
+      rate: 1024
