@@ -39,7 +39,8 @@ func main() {
 		SrcNode: "node2",
 		DstNode: "node1",
 		Properties: api.LinkProperties{
-			Rate: 10,
+			Rate:    10 * 1024,
+			Latency: 20,
 		},
 		UniDirectional: false,
 	})

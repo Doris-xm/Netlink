@@ -51,8 +51,8 @@ func (lm *LinkManager) CreateRootQdisc(n api.Node) error {
 
 // CreateHtbClass :
 // tc class add dev eth0 parent 1: classid 1:2 htb rate 1mbit burst 10000
-// tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dst 192.168.1.1 flowid 1:1
-// tc qdisc add dev eth0 parent 1:1 handle 10: netem delay 100ms
+// tc filter add dev eth0 protocol ip parent 1:0 prio 1 u32 match ip dst 192.168.1.1 flowid 1:2
+// tc qdisc add dev eth0 parent 1:2 handle 10: netem delay 100ms  # here parent is bw control classid
 // will modify node.Rules, record the classid
 // bw control comes before loss and latency
 func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
@@ -126,6 +126,24 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 		if err := netlink.FilterAdd(filter); err != nil {
 			return fmt.Errorf("failed to add u32 filter: %v", err)
 		}
+
+		// 3. add netem qdisc
+		if l.Properties.Latency > 0 || l.Properties.Loss > 0 {
+			netemQdisc := netlink.NewNetem(netlink.QdiscAttrs{
+				LinkIndex: link.Attrs().Index,
+				Parent:    l.Properties.HTBClassid,
+				Handle:    netlink.MakeHandle(10, 0), // Not important
+			}, netlink.NetemQdiscAttrs{
+				Latency: l.Properties.Latency * 1000, // delay 100ms
+				Loss:    l.Properties.Loss,           // loss 10%
+				Limit:   300000,
+			})
+
+			if err := netlink.QdiscAdd(netemQdisc); err != nil {
+				return fmt.Errorf("failed to add netem qdisc: %v", err)
+			}
+		}
+
 		return nil
 	})
 
