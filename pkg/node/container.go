@@ -3,6 +3,7 @@ package node
 import (
 	"Netlink/api"
 	"Netlink/pkg/ovs"
+	"Netlink/pkg/util"
 	"context"
 	"fmt"
 	ns "github.com/containernetworking/plugins/pkg/ns"
@@ -14,6 +15,7 @@ import (
 
 const (
 	NodeVethSuffix = "-veth0"
+	DefaultImage   = "frr:v4"
 )
 
 // ContainerManager manages the lifecycle of containers
@@ -43,6 +45,18 @@ func NewContainerManager(o *ovs.OvsManager) *ContainerManager {
 func (cm *ContainerManager) AddNode(ctx context.Context, n *api.Node) error {
 	n.Uid = cm.seq
 	cm.seq++
+	// check illegal
+	if n.Image == "" {
+		n.Image = DefaultImage
+	}
+	if !util.CheckInvalidIpv4(n.Interface.Ipv4) {
+		n.Interface.Ipv4 = "192.168.10." + fmt.Sprintf("%d", n.Uid) + "/24"
+
+		println("node ", n.Name, " has empty or invalid or system-reserved ipv4 address,"+
+			" reset to "+n.Interface.Ipv4)
+	}
+
+	// Create the container
 	sysctls := make(map[string]string)
 	sysctls["net.ipv4.ip_forward"] = "1"
 	sysctls["net.ipv6.conf.all.forwarding"] = "1"

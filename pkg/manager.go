@@ -23,12 +23,12 @@ type Manager struct {
 
 // NewManager creates a new Manager instance with the default OVS manager
 // and container manager.
-func NewManager() Manager {
+func NewManager() *Manager {
 	om := ovs.NewOvsManager()
 	cm := node.NewContainerManager(om)
 	lm := link.NewLinkManager(om)
 
-	return Manager{
+	return &Manager{
 		Nodes: make(map[string]api.Node),
 		Links: make(map[string][]string),
 		om:    om,

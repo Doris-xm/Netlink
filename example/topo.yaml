@@ -1,0 +1,49 @@
+nodes:
+  - name: "node1"
+  - name: "node2"
+  - name: "node3"
+  - name: "node4"
+  - name: "node5"
+  - name: "node6"
+  - name: "node7"
+  - name: "node8"
+  - name: "node9"
+links:
+  - srcNode: "node1"
+    dstNode: "node2"
+    properties:
+      rate: 10240
+  - srcNode: "node2"
+    dstNode: "node3"
+  - srcNode: "node1"
+    dstNode: "node4"
+  - srcNode: "node2"
+    dstNode: "node5"
+    properties:
+      rate: 10240
+      latency: 5
+  - srcNode: "node3"
+    dstNode: "node6"
+  - srcNode: "node4"
+    dstNode: "node5"
+    properties:
+      rate: 10240
+      latency: 10
+  - srcNode: "node5"
+    dstNode: "node6"
+    properties:
+      rate: 10240
+      latency: 20
+  - srcNode: "node4"
+    dstNode: "node7"
+  - srcNode: "node5"
+    dstNode: "node8"
+    properties:
+      rate: 10240
+      latency: 30
+  - srcNode: "node6"
+    dstNode: "node9"
+  - srcNode: "node7"
+    dstNode: "node8"
+  - srcNode: "node8"
+    dstNode: "node9"

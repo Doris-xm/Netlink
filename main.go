@@ -1,11 +1,11 @@
 package main
 
 import (
-	"Netlink/api"
+	"Netlink/cmd"
 	"Netlink/pkg"
+	"fmt"
 	"os"
 	"os/signal"
-	"strconv"
 	"syscall"
 )
 
@@ -14,49 +14,29 @@ import (
 // 连接：起n个docker，每个docker通过veth连接到ovs交换机，ovs交换机通过veth连接到host
 // 函数：SetupNode，SetupLinks，SetupOvs，ConfigLinks
 
-func main() {
-	m := pkg.NewManager()
+var c *pkg.Calculator
 
-	defer m.Destroy()
+func main() {
+	c = pkg.NewCalculator()
+
+	defer c.Destroy()
 
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, syscall.SIGINT, syscall.SIGTERM)
-	for i := 1; i <= 3; i++ {
-		err := m.AddNode(api.Node{
-			Name:  "node" + strconv.Itoa(i),
-			Image: "frr:v4",
-			Interface: api.NodeInterface{
-				Ipv4: "192.168.1." + strconv.Itoa(i) + "/24",
-			},
-		})
-		if err != nil {
-			println(err.Error())
-			return
+
+	go func() {
+		if err := cmd.Execute(c); err != nil {
+			fmt.Println("Error:", err.Error())
+			os.Exit(1)
 		}
-	}
+	}()
 
-	err := m.AddLink(api.Link{
-		SrcNode: "node2",
-		DstNode: "node1",
-		Properties: api.LinkProperties{
-			Rate:    10 * 1024,
-			Latency: 20,
-		},
-		UniDirectional: false,
-	})
-	if err != nil {
-		println(err.Error())
-		return
-	}
-	err = m.AddLink(api.Link{
-		SrcNode: "node3",
-		DstNode: "node2",
-	})
-	if err != nil {
-		println(err.Error())
-		return
-	}
-
+	//err := c.ApplyTopoConfig("example/topo.yaml")
+	//if err != nil {
+	//	c.Destroy()
+	//	log.Fatal(err.Error())
+	//	return
+	//}
 	// wait, before shutting down , clear up the resources
 	<-stop
 

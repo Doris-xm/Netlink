@@ -2,11 +2,11 @@ package api
 
 type Node struct {
 	Uid       int
-	Name      string
-	Interface NodeInterface
+	Name      string        `yaml:"name"`
+	Interface NodeInterface `yaml:"interface"`
 	NetNs     string
 	IsNormal  bool
-	Image     string
+	Image     string `yaml:"image"`
 
 	Rules map[string]LinkProperties // len(Rules) will never decrease, used for classid
 }
@@ -15,7 +15,7 @@ type NodeInterface struct {
 	Uid      int32
 	Name     string
 	Mac      string
-	Ipv4     string
+	Ipv4     string `yaml:"ipv4"`
 	Ipv6     string
 	NetNs    string
 	Class    string

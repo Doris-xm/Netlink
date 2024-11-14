@@ -133,7 +133,7 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 			netemQdisc := netlink.NewNetem(netlink.QdiscAttrs{
 				LinkIndex: link.Attrs().Index,
 				Parent:    l.Properties.HTBClassid,
-				Handle:    netlink.MakeHandle(10, 0), // Not important
+				Handle:    netlink.MakeHandle(uint16(len(n.Rules)+2), 0), // Not important
 			}, netlink.NetemQdiscAttrs{
 				Latency: l.Properties.Latency * 1000, // delay 100ms
 				Loss:    l.Properties.Loss,           // loss 10%
@@ -141,7 +141,7 @@ func (lm *LinkManager) CreateHtbClass(l *api.Link, n *api.Node) error {
 			})
 
 			if err := netlink.QdiscAdd(netemQdisc); err != nil {
-				return fmt.Errorf("failed to add netem qdisc: %v", err)
+				return fmt.Errorf("failed to add netem qdisc to %s: %v", n.Name, err)
 			}
 		}
 
